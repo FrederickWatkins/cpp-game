@@ -1,0 +1,1 @@
+add_library(draw buffer.cpp colour.cpp)

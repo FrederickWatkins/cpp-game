@@ -3,5 +3,5 @@ Checks: 'bugprone-*,
          cppcoreguidelines-*, 
          google-*,
          modernize-*,
-         readability-*'
+         readability-*''
 WarningsAsErrors: '*'

@@ -1,1 +1,14 @@
 BasedOnStyle: Microsoft # You can base it on any built-in style
+BinPackArguments: false
+AllowAllArgumentsOnNextLine: false
+
+# Force a line break after '('
+PenaltyBreakBeforeFirstCallParameter: 0
+
+# Put closing bracket on its own line
+AlignAfterOpenBracket: BlockIndent
+
+# Prevent short calls from staying on one line
+AllowShortFunctionsOnASingleLine: None
+AllowShortBlocksOnASingleLine: false
+ColumnLimit: 120

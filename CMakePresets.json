@@ -1,0 +1,23 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "debug-build",
+            "displayName": "Debug Build",
+            "description": "Sets up a debug build in a 'build/debug' subdirectory.",
+            "binaryDir": "${sourceDir}/build/debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "release-build",
+            "displayName": "Release Build",
+            "description": "Sets up a release build in a 'build/release' subdirectory.",
+            "binaryDir": "${sourceDir}/build/release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        }
+    ]
+}
