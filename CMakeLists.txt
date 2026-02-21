@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 project(Game LANGUAGES CXX)
 add_executable(game src/main.cpp)
 
-list(APPEND CMAKE_PROJECT_TOP_LEVEL_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}/conan_provider.cmake")
+set(CMAKE_EXPORT_COMPILE_COMMANDS On CACHE BOOL "Enable output of compile commands during generation." FORCE)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON) # Ensures configuration fails if compiler lacks C++17 support
