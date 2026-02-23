@@ -1,12 +1,16 @@
 cmake_minimum_required(VERSION 3.20)
-project(Game LANGUAGES CXX)
-add_subdirectory(src)
+project(Game LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON) # Ensures configuration fails if compiler lacks C++17 support
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+
+
+add_subdirectory(external)
+
 
 add_executable(game src/main.cpp)
 
@@ -18,5 +22,6 @@ endif()
 
 find_package(SDL3 REQUIRED)
 find_package(glm CONFIG REQUIRED)
-target_link_libraries(game PRIVATE SDL3::SDL3 PRIVATE glm::glm draw render)
+target_include_directories(game PRIVATE external/include/)
+target_link_libraries(game PRIVATE SDL3::SDL3 PRIVATE glm::glm external)
 

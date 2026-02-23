@@ -1,0 +1,2 @@
+add_library(external ${CMAKE_CURRENT_SOURCE_DIR}/src/glad.c ${CMAKE_CURRENT_SOURCE_DIR}/include/glad/glad.h ${CMAKE_CURRENT_SOURCE_DIR}/include/KHR/khrplatform.h)
+target_include_directories(external PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)

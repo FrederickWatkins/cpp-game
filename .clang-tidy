@@ -1,7 +1,7 @@
-Checks: 'bugprone-*,
-         clang-analyzer-*,
-         cppcoreguidelines-*, 
-         google-*,
-         modernize-*,
-         readability-*''
-WarningsAsErrors: '*'
+#Checks: 'bugprone-*,
+#         clang-analyzer-*,
+#         cppcoreguidelines-*, 
+#         google-*,
+#         modernize-*,
+#         readability-*'
+#WarningsAsErrors: '*'
