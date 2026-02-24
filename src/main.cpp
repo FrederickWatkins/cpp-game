@@ -2,33 +2,19 @@
 #include <SDL3/SDL_render.h>
 #include <SDL3/SDL_video.h>
 #include <array>
+#include <chrono>
+#include <cmath>
 #include <glad/glad.h>
 #include <iostream>
 #include <memory>
 
-#define WINDOW_WIDTH 600
-#define WINDOW_HEIGHT 400
+#include "fragment_shader.h"
+#include "shader.h" // IWYU pragma: keep
+
+#define WINDOW_WIDTH 1920
+#define WINDOW_HEIGHT 1080
 #define BOX_WIDTH 400
 #define BOX_HEIGHT 400
-
-const char *vertex_shader_source = "#version 330 core\n"
-                                   "layout (location = 0) in vec3 aPos;\n"
-                                   "void main()\n"
-                                   "{\n"
-                                   "   gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
-                                   "}\0";
-const char *fragment_shader_source = "#version 330 core\n"
-                                     "out vec4 FragColor;\n"
-                                     "void main()\n"
-                                     "{\n"
-                                     "    FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"
-                                     "}\0";
-const char *fragment_shader_source_2 = "#version 330 core\n"
-                                       "out vec4 FragColor;\n"
-                                       "void main()\n"
-                                       "{\n"
-                                       "    FragColor = vec4(0.2f, 0.2f, 1.0f, 1.0f);\n"
-                                       "}\0";
 
 auto create_shader_program(const char *vertex_shader_source, const char *fragment_shader_source) -> unsigned int;
 
@@ -75,10 +61,12 @@ auto main() -> int
 
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers, readability-magic-numbers)
     std::array vertices = {-0.5F, -0.5F, 0.0F, 0.5F, -0.5F, 0.0F, 0.0F, 0.5F, 0.0F};
-    std::array vertices2 = {0.0F, 0.0F, 0.5F, 0.5F, 0.0F, 0.5F, 0.0F, 0.5F, 0.5F};
+    std::array vertices2 = {0.0F, 0.0F, -0.5F, 0.5F, 0.0F, 0.5F, 0.0F, 0.5F, 0.5F};
 
-    auto shader_program = create_shader_program(vertex_shader_source, fragment_shader_source);
-    auto shader_program_2 = create_shader_program(vertex_shader_source, fragment_shader_source_2);
+    auto shader_program = create_shader_program(VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
+
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
 
     unsigned int VAO = 0;
     glGenVertexArrays(1, &VAO);
@@ -106,31 +94,52 @@ auto main() -> int
     bool quit = false;
     SDL_Event event;
 
+    auto start_time = std::chrono::system_clock::now().time_since_epoch();
+
+    size_t i = 0;
+
     while (!quit)
     {
         while (SDL_PollEvent(&event))
         {
             if (event.type == SDL_EVENT_QUIT)
             {
+
+                std::cout << ((i * 1000000000) / (std::chrono::system_clock::now().time_since_epoch() - start_time).count())
+                          << std::endl;
                 quit = true;
             }
         }
+        GLfloat curr_time =
+            std::chrono::duration<float>(std::chrono::system_clock::now().time_since_epoch() - start_time).count();
+        GLfloat red_value = (sin(curr_time) / 4.0f) + 0.5f;
+        GLfloat z_offset = (sin(curr_time * 2.0f) / 2.0f);
 
-        SDL_SetRenderDrawColor(renderer.get(), 0, 0, 0, UINT8_MAX);
-        SDL_RenderClear(renderer.get());
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glUseProgram(shader_program);
         glBindVertexArray(VAO);
+        GLint vertex_colour_location = glGetUniformLocation(shader_program, "ourColour");
+        glUniform4f(vertex_colour_location, red_value, 0.0f, 0.0f, 1.0f);
+        GLint offset_location = glGetUniformLocation(shader_program, "offset");
+        glUniform3f(offset_location, 0.0f, 0.0f, z_offset);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glUniform4f(vertex_colour_location, 0.0f, 1.0f - red_value, 0.0f, 1.0f);
+        glUniform3f(offset_location, -0.5f, z_offset, 0.0f);
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
-        glUseProgram(shader_program_2);
+        glUseProgram(shader_program);
         glBindVertexArray(VAO2);
+        glUniform4f(vertex_colour_location, 0.0f, 0.0f, 1.0f, 1.0f);
+        glUniform3f(offset_location, 0.0f, 0.0f, 0.0f);
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
         // Present the backbuffer to the screen
         SDL_GL_SwapWindow(window.get());
-    }
 
+        i++;
+    }
     SDL_Quit();
     return 0;
 }
