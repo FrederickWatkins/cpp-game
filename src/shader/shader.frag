@@ -1,6 +1,6 @@
 #version 330 core
-in vec4 vertexColour;
-out vec4 fragColour;
+in vec4 vertex_colour;
+out vec4 frag_colour;
 void main() {
-    fragColour = vertexColour;
+    frag_colour = vertex_colour;
 }
