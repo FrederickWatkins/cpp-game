@@ -2,6 +2,10 @@
 #include <stdexcept>
 #include <string>
 
+#include "fragment_wcnn.h"
+#include "vertex_ncnn.h"
+#include "vertex_wcnn.h"
+
 ShaderProgram::ShaderProgram(const char *vertex_source, const char *fragment_source)
 {
     unsigned int vertex_shader = 0;
@@ -55,4 +59,28 @@ void ShaderProgram::use()
 auto ShaderProgram::get_uniform_location(std::string_view uniform) -> GLuint
 {
     return glGetUniformLocation(program, uniform.begin());
+}
+
+auto shader_ncnn() -> ShaderProgram
+{
+    static auto program = ShaderProgram(0);
+    static bool initialized = false;
+    if (!initialized)
+    {
+        program = ShaderProgram(VERTEX_NCNN, FRAGMENT_WCNN);
+        initialized = true;
+    }
+    return program;
+}
+
+auto shader_wcnn() -> ShaderProgram
+{
+    static auto program = ShaderProgram(0);
+    static bool initialized = false;
+    if (!initialized)
+    {
+        program = ShaderProgram(VERTEX_WCNN, FRAGMENT_WCNN);
+        initialized = true;
+    }
+    return program;
 }

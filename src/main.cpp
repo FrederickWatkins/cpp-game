@@ -8,6 +8,7 @@
 #include <cmath>
 #include <glad/glad.h>
 #include <glm/ext/matrix_transform.hpp>
+#include <glm/ext/vector_float3.hpp>
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -28,93 +29,146 @@
 #define BOX_WIDTH 400
 #define BOX_HEIGHT 400
 
-struct XYZRGBA
+struct Empty
 {
-    glm::vec3 position;
-    glm::vec4 colour;
 };
 
-auto cube(float side_length) -> std::vector<XYZRGBA>
+template <bool HasColour, bool HasNormal, bool HasTex> struct VertexAttributes
 {
+    glm::vec3 position;
+
+    // Optional members
+    [[no_unique_address]] std::conditional_t<HasColour, glm::vec4, Empty> colour;
+    [[no_unique_address]] std::conditional_t<HasNormal, glm::vec3, Empty> normal;
+    [[no_unique_address]] std::conditional_t<HasTex, glm::vec2, Empty> texCoords;
+};
+
+template <bool HasColour, bool HasNormal, bool HasTex>
+auto cube(float side_length) -> std::vector<VertexAttributes<HasColour, HasNormal, HasTex>>
+{
+    using Vertex = VertexAttributes<HasColour, HasNormal, HasTex>;
     float h = side_length / 2.0f;
-    std::vector<XYZRGBA> vertices;
+    std::vector<Vertex> vertices;
     vertices.reserve(36);
 
-    // Cube corners
+    // 8 Corner points
     glm::vec3 p0{-h, -h, h}, p1{h, -h, h}, p2{h, h, h}, p3{-h, h, h}, p4{-h, -h, -h}, p5{h, -h, -h}, p6{h, h, -h},
         p7{-h, h, -h};
 
-    // CGA Color Palette (High Intensity)
-    glm::vec4 cga_red{1.0f, 0.33f, 0.33f, 1.0f};
-    glm::vec4 cga_green{0.33f, 1.0f, 0.33f, 1.0f};
-    glm::vec4 cga_blue{0.33f, 0.33f, 1.0f, 1.0f};
-    glm::vec4 cga_yellow{1.0f, 1.0f, 0.33f, 1.0f};
-    glm::vec4 cga_magenta{1.0f, 0.33f, 1.0f, 1.0f};
-    glm::vec4 cga_cyan{0.33f, 1.0f, 1.0f, 1.0f};
-
-    auto addFace = [&](glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec4 color) {
-        vertices.push_back({a, color});
-        vertices.push_back({b, color});
-        vertices.push_back({c, color});
-        vertices.push_back({a, color});
-        vertices.push_back({c, color});
-        vertices.push_back({d, color});
+    // CGA Palette for faces
+    const glm::vec4 cga[] = {
+        {1.0f, 0.0f, 0.0f, 1.0f},
+        {0.0f, 1.0f, 0.0f, 1.0f},
+        {0.0f, 0.0f, 1.0f, 1.0f},
+        {0.75f, 0.75f, 0.0f, 1.0f},
+        {0.75f, 0.0f, 0.75f, 1.0f},
+        {0.0f, 0.75f, 0.75f, 1.0f}
     };
 
-    // Construct faces with distinct colors
-    addFace(p0, p1, p2, p3, cga_red);     // Front
-    addFace(p5, p4, p7, p6, cga_green);   // Back
-    addFace(p3, p2, p6, p7, cga_blue);    // Top
-    addFace(p4, p5, p1, p0, cga_yellow);  // Bottom
-    addFace(p4, p0, p3, p7, cga_magenta); // Left
-    addFace(p1, p5, p6, p2, cga_cyan);    // Right
+    // UV coordinates for a single face
+    const glm::vec2 uvs[] = {{0, 1}, {1, 1}, {1, 0}, {0, 0}};
+
+    auto addFace = [&](glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 norm, int faceIdx) {
+        auto push = [&](glm::vec3 pos, glm::vec2 uv) {
+            Vertex v;
+            v.position = pos;
+            if constexpr (HasNormal)
+                v.normal = norm;
+            if constexpr (HasColour)
+                v.colour = cga[faceIdx];
+            if constexpr (HasTex)
+                v.texCoords = uv;
+            vertices.push_back(v);
+        };
+
+        // Two triangles per face
+        push(a, uvs[0]);
+        push(b, uvs[1]);
+        push(c, uvs[2]);
+        push(a, uvs[0]);
+        push(c, uvs[2]);
+        push(d, uvs[3]);
+    };
+
+    // Define faces: Front, Back, Top, Bottom, Left, Right
+    addFace(p0, p1, p2, p3, {0, 0, 1}, 0);
+    addFace(p5, p4, p7, p6, {0, 0, -1}, 1);
+    addFace(p3, p2, p6, p7, {0, 1, 0}, 2);
+    addFace(p4, p5, p1, p0, {0, -1, 0}, 3);
+    addFace(p4, p0, p3, p7, {-1, 0, 0}, 4);
+    addFace(p1, p5, p6, p2, {1, 0, 0}, 5);
 
     return vertices;
 }
 
-auto load_mesh_to_vector(const std::string &path) -> std::vector<XYZRGBA>
+template <bool HasColour, bool HasNormal, bool HasTex>
+auto load_mesh(const std::string &path) -> std::vector<VertexAttributes<HasColour, HasNormal, HasTex>>
 {
     Assimp::Importer importer;
-    const aiScene *scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs);
+
+    // Logic: Always triangulate. Generate normals only if requested.
+    unsigned int flags = aiProcess_Triangulate | aiProcess_FlipUVs;
+    if constexpr (HasNormal)
+    {
+        flags |= aiProcess_GenSmoothNormals;
+    }
+
+    const aiScene *scene = importer.ReadFile(path, flags);
 
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
     {
-        std::cout << "Couldn't open file" << std::endl;
-        return {};
+        throw std::runtime_error("Assimp: " + std::string(importer.GetErrorString()));
     }
 
-    std::vector<XYZRGBA> vertices;
+    using Vertex = VertexAttributes<HasColour, HasNormal, HasTex>;
+    std::vector<Vertex> vertices;
 
-    // Iterate through all meshes in the file
     for (unsigned int m = 0; m < scene->mNumMeshes; m++)
     {
         aiMesh *mesh = scene->mMeshes[m];
+
+        // Validation for required attributes
+        if constexpr (HasColour)
+        {
+            if (!mesh->HasVertexColors(0))
+                throw std::runtime_error("Mesh missing required color data");
+        }
+        if constexpr (HasTex)
+        {
+            if (!mesh->HasTextureCoords(0))
+                throw std::runtime_error("Mesh missing required texture data");
+        }
 
         for (unsigned int f = 0; f < mesh->mNumFaces; f++)
         {
             aiFace &face = mesh->mFaces[f];
             for (unsigned int i = 0; i < face.mNumIndices; i++)
             {
-                unsigned int index = face.mIndices[i];
+                unsigned int idx = face.mIndices[i];
+                Vertex v;
 
-                XYZRGBA v;
-                v.position = {mesh->mVertices[index].x, mesh->mVertices[index].y, mesh->mVertices[index].z};
+                v.position = {mesh->mVertices[idx].x, mesh->mVertices[idx].y, mesh->mVertices[idx].z};
 
-                // If the mesh has colors, use them; otherwise, maybe color by Face ID?
-                if (mesh->HasVertexColors(0))
+                if constexpr (HasNormal)
                 {
-                    aiColor4D c = mesh->mColors[0][index];
+                    v.normal = {mesh->mNormals[idx].x, mesh->mNormals[idx].y, mesh->mNormals[idx].z};
+                }
+
+                if constexpr (HasColour)
+                {
+                    aiColor4D c = mesh->mColors[0][idx];
                     v.colour = {c.r, c.g, c.b, c.a};
                 }
-                else
+
+                if constexpr (HasTex)
                 {
-                    v.colour = {0.5 - (v.position.z / 100.0f), 0.33f, 0.5 + v.position.z / 100.0f, 1.0f};
+                    v.texCoords = {mesh->mTextureCoords[0][idx].x, mesh->mTextureCoords[0][idx].y};
                 }
+
                 vertices.push_back(v);
             }
         }
     }
-
     return vertices;
 }
 
@@ -159,18 +213,42 @@ auto main() -> int
         return -1;
     }
 
-    auto worldspace_shader = ShaderProgram(VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
+    auto worldspace_shader = shader_wcnn();
+    auto ndcspace_shader = shader_ncnn();
 
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
 
-    // std::vector<XYZRGBA> vertices = cube(2.0f);
-    std::vector<XYZRGBA> vertices = load_mesh_to_vector("teapot.obj");
+    std::vector<VertexAttributes<true, false, false>> vertices = cube<true, false, false>(60.0f);
+    std::vector<VertexAttributes<false, false, false>> colourless_vertices =
+        load_mesh<false, false, false>("teapot.obj");
+
+    /*std::vector<VertexAttributes<true, false, false>> vertices;
+    for (size_t i = 0; i < colourless_vertices.size(); i++)
+    {
+        vertices.push_back(
+            {colourless_vertices[i].position,
+             {0.5 - (colourless_vertices[i].position.z / 100.0f),
+              0.33f,
+              0.5 + colourless_vertices[i].position.z / 100.0f,
+              1.0f},
+             {},
+             {}}
+        );
+    }*/
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
-    auto vao1 = std::make_unique<VertexArrayObject<XYZRGBA, 3, 4>>();
+    auto vao1 = std::make_unique<VertexArrayObject<VertexAttributes<true, false, false>, 3, 4>>();
     vao1->add_vbo(vertices);
+
+    auto ndc_vao = std::make_unique<VertexArrayObject<VertexAttributes<true, false, false>, 3, 4>>();
+    auto triangle_vertices = std::vector<VertexAttributes<true, false, false>>({
+        {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {}, {}},
+        {{1.0f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {}, {}},
+        {{0.75f, 0.75f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {}, {}},
+    });
+    ndc_vao->add_vbo(triangle_vertices);
 
     bool quit = false;
     SDL_Event event;
@@ -179,6 +257,9 @@ auto main() -> int
 
     std::array modes = {GL_LINE, GL_POINT, GL_FILL};
     size_t mode = 2;
+
+    size_t window_width = WINDOW_WIDTH;
+    size_t window_height = WINDOW_HEIGHT;
 
     size_t i = 0;
 
@@ -202,6 +283,12 @@ auto main() -> int
                     mode = 0;
                 }
             }
+            if (event.type == SDL_EVENT_WINDOW_RESIZED)
+            {
+                window_width = event.window.data1;
+                window_height = event.window.data2;
+                glViewport(0, 0, window_width, window_height);
+            }
         }
 
         glPolygonMode(GL_FRONT_AND_BACK, modes[mode]);
@@ -220,8 +307,8 @@ auto main() -> int
         );
         glm::mat4 proj_mat = glm::perspective(
             glm::radians(70.0f),
-            static_cast<float>(WINDOW_WIDTH) / static_cast<float>(WINDOW_HEIGHT),
-            1.0f,
+            static_cast<float>(window_width) / static_cast<float>(window_height),
+            10.0f,
             100000.0f
         );
         glm::mat4 transform_mat = proj_mat * view_mat;
@@ -255,6 +342,9 @@ auto main() -> int
                 }
             }
         }
+        ndcspace_shader.use();
+        ndc_vao->use();
+        ndc_vao->draw();
 
         // Present the backbuffer to the screen
         SDL_GL_SwapWindow(window.get());
