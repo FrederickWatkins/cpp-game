@@ -7,16 +7,15 @@
 #include <glad/glad.h>
 #include <iostream>
 #include <memory>
+#include <vector>
 
-#include "fragment_shader.h"
-#include "shader.h" // IWYU pragma: keep
+#include "shader/shader.h"
+#include "vertex/vao.h"
 
-#define WINDOW_WIDTH 1920
-#define WINDOW_HEIGHT 1080
+#define WINDOW_WIDTH 800
+#define WINDOW_HEIGHT 600
 #define BOX_WIDTH 400
 #define BOX_HEIGHT 400
-
-auto create_shader_program(const char *vertex_shader_source, const char *fragment_shader_source) -> unsigned int;
 
 auto main() -> int
 {
@@ -57,39 +56,30 @@ auto main() -> int
         return -1;
     }
 
+    auto ndc_shader = ShaderProgram(VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
+
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
 
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers, readability-magic-numbers)
-    std::array vertices = {-0.5F, -0.5F, 0.0F, 0.5F, -0.5F, 0.0F, 0.0F, 0.5F, 0.0F};
-    std::array vertices2 = {0.0F, 0.0F, -0.5F, 0.5F, 0.0F, 0.5F, 0.0F, 0.5F, 0.5F};
-
-    auto shader_program = create_shader_program(VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
+    std::vector<std::array<float, 7>> vertices = {
+        {{-0.5F, -0.5F, 0.0F, 0.0f, 1.0f, 0.0f, 1.0f}},
+        {{0.5F, -0.5F, 0.0F, 1.0f, 0.0f, 0.0f, 1.0f}},
+        {{0.0F, 0.5F, 0.0F, 0.0f, 0.0f, 1.0f, 1.0f}},
+    };
+    std::vector<std::array<float, 7>> vertices2 = {
+        {0.0F, 0.0F, -0.5F, 0.0f, 0.0f, 1.0f, 1.0f},
+        {0.5F, 0.0F, 0.5F, 0.0f, 0.0f, 1.0f, 1.0f},
+        {0.0F, 0.5F, 0.5F, 0.0f, 0.0f, 1.0f, 1.0f},
+    };
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
-    unsigned int VAO = 0;
-    glGenVertexArrays(1, &VAO);
-    unsigned int VBO = 0;
-    glGenBuffers(1, &VBO);
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices.data(), GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)nullptr);
-    glEnableVertexAttribArray(0);
+    auto vao1 = std::make_unique<VertexArrayObject<std::array<float, 7>, 3, 4>>();
+    vao1->add_vbo(vertices);
 
-    unsigned int VAO2 = 0;
-    glGenVertexArrays(1, &VAO2);
-    VBO = 0;
-    glGenBuffers(1, &VBO);
-    glBindVertexArray(VAO2);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices2), vertices2.data(), GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)nullptr);
-    glEnableVertexAttribArray(0);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
+    auto vao2 = std::make_unique<VertexArrayObject<std::array<float, 7>, 3, 4>>();
+    vao2->add_vbo(vertices2);
 
     bool quit = false;
     SDL_Event event;
@@ -105,7 +95,8 @@ auto main() -> int
             if (event.type == SDL_EVENT_QUIT)
             {
 
-                std::cout << ((i * 1000000000) / (std::chrono::system_clock::now().time_since_epoch() - start_time).count())
+                std::cout << ((i * 1000000000) /
+                              (std::chrono::system_clock::now().time_since_epoch() - start_time).count())
                           << std::endl;
                 quit = true;
             }
@@ -118,22 +109,23 @@ auto main() -> int
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glUseProgram(shader_program);
-        glBindVertexArray(VAO);
-        GLint vertex_colour_location = glGetUniformLocation(shader_program, "ourColour");
+        ndc_shader.use();
+        vao1->use();
+        GLint vertex_colour_location = ndc_shader.get_uniform_location("ourColour");
         glUniform4f(vertex_colour_location, red_value, 0.0f, 0.0f, 1.0f);
-        GLint offset_location = glGetUniformLocation(shader_program, "offset");
+        GLint offset_location = ndc_shader.get_uniform_location("offset");
         glUniform3f(offset_location, 0.0f, 0.0f, z_offset);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        vao1->draw();
         glUniform4f(vertex_colour_location, 0.0f, 1.0f - red_value, 0.0f, 1.0f);
         glUniform3f(offset_location, -0.5f, z_offset, 0.0f);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        vao1->draw();
 
-        glUseProgram(shader_program);
-        glBindVertexArray(VAO2);
+        ndc_shader.use();
+        vao2->use();
         glUniform4f(vertex_colour_location, 0.0f, 0.0f, 1.0f, 1.0f);
         glUniform3f(offset_location, 0.0f, 0.0f, 0.0f);
         glDrawArrays(GL_TRIANGLES, 0, 3);
+        vao2->draw();
 
         // Present the backbuffer to the screen
         SDL_GL_SwapWindow(window.get());
@@ -142,51 +134,4 @@ auto main() -> int
     }
     SDL_Quit();
     return 0;
-}
-
-auto create_shader_program(const char *vertex_shader_source, const char *fragment_shader_source) -> unsigned int
-{
-    unsigned int vertexShader = 0;
-    vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &vertex_shader_source, nullptr);
-    glCompileShader(vertexShader);
-
-    int vertex_success = 0;
-    char infoLog[512];
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &vertex_success);
-    if (vertex_success == 0)
-    {
-        glGetShaderInfoLog(vertexShader, 512, nullptr, infoLog);
-        std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
-    }
-
-    unsigned int fragmentShader = 0;
-    fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragment_shader_source, nullptr);
-    glCompileShader(fragmentShader);
-
-    int fragment_success = 0;
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &fragment_success);
-    if (fragment_success == 0)
-    {
-        glGetShaderInfoLog(fragmentShader, 512, nullptr, infoLog);
-        std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
-    }
-
-    unsigned int shaderProgram = 0;
-    shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
-
-    int link_success = 0;
-    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &link_success);
-    if (link_success == 0)
-    {
-        glGetProgramInfoLog(shaderProgram, 512, nullptr, infoLog);
-        std::cout << "ERROR::SHADER::LINK_FAILED\n" << infoLog << std::endl;
-    }
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-    return shaderProgram;
 }

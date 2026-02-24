@@ -53,5 +53,5 @@ endif()
 find_package(SDL3 REQUIRED)
 find_package(glm CONFIG REQUIRED)
 target_include_directories(game PRIVATE external/include/)
-target_link_libraries(game PRIVATE SDL3::SDL3 PRIVATE glm::glm external shader)
+target_link_libraries(game PRIVATE SDL3::SDL3 PRIVATE glm::glm external src)
 
