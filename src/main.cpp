@@ -222,28 +222,37 @@ auto main() -> int
             glm::radians(70.0f),
             static_cast<float>(WINDOW_WIDTH) / static_cast<float>(WINDOW_HEIGHT),
             1.0f,
-            10000.0f
+            100000.0f
         );
         glm::mat4 transform_mat = proj_mat * view_mat;
 
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        glm::mat4 combined_transform_mat =
+            transform_mat * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)) * rotation_mat;
+
         worldspace_shader.use();
         vao1->use();
-        GLint offset_location = worldspace_shader.get_uniform_location("offset");
-        GLint transform_mat_location = worldspace_shader.get_uniform_location("transform_mat");
-        GLint rotation_mat_location = worldspace_shader.get_uniform_location("rotation_mat");
-        glUniform3f(offset_location, 0.0f, 0.0f, 0.0f);
-        glUniformMatrix4fv(transform_mat_location, 1, false, glm::value_ptr(transform_mat));
-        glUniformMatrix4fv(rotation_mat_location, 1, false, glm::value_ptr(rotation_mat));
+        GLint combined_transform_mat_location = worldspace_shader.get_uniform_location("combined_transform_mat");
+        glUniformMatrix4fv(combined_transform_mat_location, 1, false, glm::value_ptr(combined_transform_mat));
         vao1->draw();
-        for (float i = 100.0f; i < 10000.0f; i += 100.0f)
+        for (float i = 100.0f; i <= 1000.0f; i += 100.0f)
         {
             for (float j = -500.0f; j <= 500.0f; j += 100.0f)
             {
-                glUniform3f(offset_location, -i, 0.0f, j);
-                vao1->draw();
+                for (float k = -300.0f; k <= 100.0f; k += 100.0f)
+                {
+                    combined_transform_mat =
+                        transform_mat * glm::translate(glm::mat4(1.0f), glm::vec3(-i, k, j)) * rotation_mat;
+                    glUniformMatrix4fv(
+                        combined_transform_mat_location,
+                        1,
+                        false,
+                        glm::value_ptr(combined_transform_mat)
+                    );
+                    vao1->draw();
+                }
             }
         }
 
