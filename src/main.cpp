@@ -29,24 +29,10 @@
 #define BOX_WIDTH 400
 #define BOX_HEIGHT 400
 
-struct Empty
+template <bool has_colour, bool has_normal, size_t num_tex_coords>
+auto cube(float side_length) -> std::vector<VertexAttributes<has_colour, has_normal, num_tex_coords>>
 {
-};
-
-template <bool HasColour, bool HasNormal, bool HasTex> struct VertexAttributes
-{
-    glm::vec3 position;
-
-    // Optional members
-    [[no_unique_address]] std::conditional_t<HasColour, glm::vec4, Empty> colour;
-    [[no_unique_address]] std::conditional_t<HasNormal, glm::vec3, Empty> normal;
-    [[no_unique_address]] std::conditional_t<HasTex, glm::vec2, Empty> texCoords;
-};
-
-template <bool HasColour, bool HasNormal, bool HasTex>
-auto cube(float side_length) -> std::vector<VertexAttributes<HasColour, HasNormal, HasTex>>
-{
-    using Vertex = VertexAttributes<HasColour, HasNormal, HasTex>;
+    using Vertex = VertexAttributes<has_colour, has_normal, num_tex_coords>;
     float h = side_length / 2.0f;
     std::vector<Vertex> vertices;
     vertices.reserve(36);
@@ -66,18 +52,22 @@ auto cube(float side_length) -> std::vector<VertexAttributes<HasColour, HasNorma
     };
 
     // UV coordinates for a single face
-    const glm::vec2 uvs[] = {{0, 1}, {1, 1}, {1, 0}, {0, 0}};
+    const glm::vec3 uvs[] = {{0, 1, 0}, {1, 1, 0}, {1, 0, 0}, {0, 0, 0}};
 
     auto addFace = [&](glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 norm, int faceIdx) {
-        auto push = [&](glm::vec3 pos, glm::vec2 uv) {
+        auto push = [&](glm::vec3 pos, glm::vec3 tex_coords) {
             Vertex v;
             v.position = pos;
-            if constexpr (HasNormal)
+            if constexpr (has_normal)
                 v.normal = norm;
-            if constexpr (HasColour)
+            if constexpr (has_colour)
                 v.colour = cga[faceIdx];
-            if constexpr (HasTex)
-                v.texCoords = uv;
+            if constexpr (num_tex_coords >= 1)
+                v.tex_coords[0] = tex_coords[0];
+            if constexpr (num_tex_coords >= 2)
+                v.tex_coords[1] = tex_coords[1];
+            if constexpr (num_tex_coords >= 3)
+                v.tex_coords[2] = tex_coords[2];
             vertices.push_back(v);
         };
 
@@ -101,14 +91,14 @@ auto cube(float side_length) -> std::vector<VertexAttributes<HasColour, HasNorma
     return vertices;
 }
 
-template <bool HasColour, bool HasNormal, bool HasTex>
-auto load_mesh(const std::string &path) -> std::vector<VertexAttributes<HasColour, HasNormal, HasTex>>
+template <bool has_colour, bool has_normal, size_t num_tex_coords>
+auto load_mesh(const std::string &path) -> std::vector<VertexAttributes<has_colour, has_normal, num_tex_coords>>
 {
     Assimp::Importer importer;
 
     // Logic: Always triangulate. Generate normals only if requested.
     unsigned int flags = aiProcess_Triangulate | aiProcess_FlipUVs;
-    if constexpr (HasNormal)
+    if constexpr (has_normal)
     {
         flags |= aiProcess_GenSmoothNormals;
     }
@@ -120,7 +110,7 @@ auto load_mesh(const std::string &path) -> std::vector<VertexAttributes<HasColou
         throw std::runtime_error("Assimp: " + std::string(importer.GetErrorString()));
     }
 
-    using Vertex = VertexAttributes<HasColour, HasNormal, HasTex>;
+    using Vertex = VertexAttributes<has_colour, has_normal, num_tex_coords>;
     std::vector<Vertex> vertices;
 
     for (unsigned int m = 0; m < scene->mNumMeshes; m++)
@@ -128,12 +118,12 @@ auto load_mesh(const std::string &path) -> std::vector<VertexAttributes<HasColou
         aiMesh *mesh = scene->mMeshes[m];
 
         // Validation for required attributes
-        if constexpr (HasColour)
+        if constexpr (has_colour)
         {
             if (!mesh->HasVertexColors(0))
-                throw std::runtime_error("Mesh missing required color data");
+                throw std::runtime_error("Mesh missing required colour data");
         }
-        if constexpr (HasTex)
+        if constexpr (num_tex_coords > 0)
         {
             if (!mesh->HasTextureCoords(0))
                 throw std::runtime_error("Mesh missing required texture data");
@@ -149,21 +139,23 @@ auto load_mesh(const std::string &path) -> std::vector<VertexAttributes<HasColou
 
                 v.position = {mesh->mVertices[idx].x, mesh->mVertices[idx].y, mesh->mVertices[idx].z};
 
-                if constexpr (HasNormal)
+                if constexpr (has_normal)
                 {
                     v.normal = {mesh->mNormals[idx].x, mesh->mNormals[idx].y, mesh->mNormals[idx].z};
                 }
 
-                if constexpr (HasColour)
+                if constexpr (has_colour)
                 {
                     aiColor4D c = mesh->mColors[0][idx];
                     v.colour = {c.r, c.g, c.b, c.a};
                 }
 
-                if constexpr (HasTex)
-                {
-                    v.texCoords = {mesh->mTextureCoords[0][idx].x, mesh->mTextureCoords[0][idx].y};
-                }
+                if constexpr (num_tex_coords >= 1)
+                    v.tex_coords[0] = mesh->mTextureCoords[0][idx][0];
+                if constexpr (num_tex_coords >= 2)
+                    v.tex_coords[1] = mesh->mTextureCoords[0][idx][1];
+                if constexpr (num_tex_coords >= 3)
+                    v.tex_coords[2] = mesh->mTextureCoords[0][idx][2];
 
                 vertices.push_back(v);
             }
@@ -218,11 +210,10 @@ auto main() -> int
 
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
 
-    std::vector<VertexAttributes<true, false, false>> vertices = cube<true, false, false>(60.0f);
-    std::vector<VertexAttributes<false, false, false>> colourless_vertices =
-        load_mesh<false, false, false>("teapot.obj");
+    //auto vertices = cube<true, false, 0>(60.0f);
+    auto colourless_vertices = load_mesh<false, true, 0>("teapot.obj");
 
-    /*std::vector<VertexAttributes<true, false, false>> vertices;
+    std::vector<VertexAttributes<true, false, false>> vertices;
     for (size_t i = 0; i < colourless_vertices.size(); i++)
     {
         vertices.push_back(
@@ -234,16 +225,16 @@ auto main() -> int
              {},
              {}}
         );
-    }*/
+    }
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
-    auto vao1 = std::make_unique<VertexArrayObject<VertexAttributes<true, false, false>, 3, 4>>();
+    auto vao1 = std::make_unique<VertexArrayObject<true, false, 0>>();
     vao1->add_vbo(vertices);
 
-    auto ndc_vao = std::make_unique<VertexArrayObject<VertexAttributes<true, false, false>, 3, 4>>();
-    auto triangle_vertices = std::vector<VertexAttributes<true, false, false>>({
+    auto ndc_vao = std::make_unique<VertexArrayObject<true, false, 0>>();
+    auto triangle_vertices = std::vector<VertexAttributes<true, false, 0>>({
         {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {}, {}},
         {{1.0f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {}, {}},
         {{0.75f, 0.75f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {}, {}},

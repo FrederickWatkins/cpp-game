@@ -1,9 +1,26 @@
+#include <cstddef>
 #include <glad/glad.h>
+#include <glm/glm.hpp>
 #include <vector>
 
-template <typename vertex_attributes, size_t... attribute_sizes> class VertexArrayObject
-{
+struct empty_colour {};
 
+struct empty_normal {};
+
+struct empty_tex {};
+
+template <bool has_colour, bool has_normal, size_t num_tex_coords> struct VertexAttributes
+{
+    glm::vec3 position;
+
+    // Optional members
+    [[no_unique_address]] std::conditional_t<has_colour, glm::vec4, empty_colour> colour;
+    [[no_unique_address]] std::conditional_t<has_normal, glm::vec3, empty_normal> normal;
+    [[no_unique_address]] std::conditional_t<(num_tex_coords > 0), glm::vec<num_tex_coords, float>, empty_tex> tex_coords;
+};
+
+template <bool has_colour, bool has_normal, size_t num_tex_coords> class VertexArrayObject
+{
   public:
     VertexArrayObject() : count(0)
     {
@@ -13,26 +30,29 @@ template <typename vertex_attributes, size_t... attribute_sizes> class VertexArr
     {
         glBindVertexArray(VAO);
     }
-    void add_vbo(std::vector<vertex_attributes> &vertex_data)
+    void add_vbo(std::vector<VertexAttributes<has_colour, has_normal, num_tex_coords>> &vertex_data)
     {
         use();
         unsigned int VBO;
         glGenBuffers(1, &VBO);
         glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glBufferData(
-            GL_ARRAY_BUFFER,
-            vertex_data.size() * sizeof(vertex_attributes),
-            vertex_data.data(),
-            GL_STATIC_DRAW
-        );
-        static constexpr size_t sizes[] = {attribute_sizes...};
-        size_t offset = 0;
-        for (size_t i = 0; i < sizeof...(attribute_sizes); i++)
+        glBufferData(GL_ARRAY_BUFFER, vertex_data.size() * sizeof(vertex), vertex_data.data(), GL_STATIC_DRAW);
+        // Position
+        add_attribute_pointer(0, 3, GL_FLOAT, offsetof(vertex, position));
+        // Colour
+        if constexpr (has_colour)
         {
-            glVertexAttribPointer(i, sizes[i], GL_FLOAT, GL_FALSE, sizeof(vertex_attributes), (void *)offset);
-            offset += sizes[i] * sizeof(float);
-
-            glEnableVertexAttribArray(i);
+            add_attribute_pointer(1, 4, GL_FLOAT, offsetof(vertex, colour));
+        }
+        // Normals
+        if constexpr (has_normal)
+        {
+            add_attribute_pointer(2, 3, GL_FLOAT, offsetof(vertex, normal));
+        }
+        // Texture coordinates
+        static_assert(num_tex_coords <= 3, "Texture coordinates over 3d are not supported");
+        if constexpr (num_tex_coords > 0 && num_tex_coords <= 3) {
+            add_attribute_pointer(3, num_tex_coords, GL_FLOAT, offsetof(vertex, normal));
         }
         count += vertex_data.size();
         // Unbind
@@ -45,6 +65,19 @@ template <typename vertex_attributes, size_t... attribute_sizes> class VertexArr
     }
 
   private:
+    void add_attribute_pointer(size_t location, size_t size, size_t type, size_t offset)
+    {
+        glVertexAttribPointer(
+            location,
+            size,
+            type,
+            GL_FALSE,
+            sizeof(VertexAttributes<has_colour, has_normal, num_tex_coords>),
+            (void *)offset
+        );
+        glEnableVertexAttribArray(location);
+    }
     unsigned int VAO;
     unsigned int count;
+    typedef VertexAttributes<has_colour, has_normal, num_tex_coords> vertex;
 };
