@@ -1,5 +1,5 @@
-#include "../shader/shader.h"
-#include "../vertex/vao.h"
+#include "../shader/shader.hpp"
+#include "../vertex/vao.hpp"
 #include <assimp/mesh.h>
 #include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>

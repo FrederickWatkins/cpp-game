@@ -22,9 +22,9 @@
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 
-#include "mesh/mesh.h"
-#include "shader/shader.h"
-#include "vertex/vao.h"
+#include "mesh/mesh.hpp"
+#include "shader/shader.hpp"
+#include "vertex/vao.hpp"
 
 #define WINDOW_WIDTH 1920
 #define WINDOW_HEIGHT 1080
