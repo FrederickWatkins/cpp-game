@@ -56,7 +56,7 @@ void ShaderProgram::use()
     glUseProgram(program);
 }
 
-auto ShaderProgram::get_uniform_location(std::string_view uniform) -> GLuint
+auto ShaderProgram::get_uniform_location(std::string_view uniform) -> GLint
 {
     return glGetUniformLocation(program, uniform.begin());
 }

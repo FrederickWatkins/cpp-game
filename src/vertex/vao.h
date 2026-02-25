@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cstddef>
 #include <glad/glad.h>
 #include <glm/glm.hpp>
@@ -36,25 +38,25 @@ template <bool has_colour, bool has_normal, size_t num_tex_coords> class VertexA
         unsigned int VBO;
         glGenBuffers(1, &VBO);
         glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glBufferData(GL_ARRAY_BUFFER, vertex_data.size() * sizeof(vertex), vertex_data.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, vertex_data.size() * sizeof(Vertex), vertex_data.data(), GL_STATIC_DRAW);
         // Position
-        add_attribute_pointer(0, 3, GL_FLOAT, offsetof(vertex, position));
+        add_attribute_pointer(0, 3, GL_FLOAT, offsetof(Vertex, position));
         // Colour
         if constexpr (has_colour)
         {
-            add_attribute_pointer(1, 4, GL_FLOAT, offsetof(vertex, colour));
+            add_attribute_pointer(1, 4, GL_FLOAT, offsetof(Vertex, colour));
         }
         // Normals
         if constexpr (has_normal)
         {
-            add_attribute_pointer(2, 3, GL_FLOAT, offsetof(vertex, normal));
+            add_attribute_pointer(2, 3, GL_FLOAT, offsetof(Vertex, normal));
         }
         // Texture coordinates
         static_assert(num_tex_coords <= 3, "Texture coordinates over 3d are not supported");
         if constexpr (num_tex_coords > 0 && num_tex_coords <= 3) {
-            add_attribute_pointer(3, num_tex_coords, GL_FLOAT, offsetof(vertex, normal));
+            add_attribute_pointer(3, num_tex_coords, GL_FLOAT, offsetof(Vertex, tex_coords));
         }
-        count += vertex_data.size();
+        count = vertex_data.size();
         // Unbind
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
@@ -79,5 +81,5 @@ template <bool has_colour, bool has_normal, size_t num_tex_coords> class VertexA
     }
     unsigned int VAO;
     unsigned int count;
-    typedef VertexAttributes<has_colour, has_normal, num_tex_coords> vertex;
+    using Vertex = VertexAttributes<has_colour, has_normal, num_tex_coords>;
 };

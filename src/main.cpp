@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cmath>
 #include <glad/glad.h>
+#include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/vector_float3.hpp>
 #include <glm/geometric.hpp>
@@ -23,6 +24,7 @@
 
 #include "shader/shader.h"
 #include "vertex/vao.h"
+#include "mesh/mesh.h"
 
 #define WINDOW_WIDTH 1920
 #define WINDOW_HEIGHT 1080
@@ -91,17 +93,13 @@ auto cube(float side_length) -> std::vector<VertexAttributes<has_colour, has_nor
     return vertices;
 }
 
-template <bool has_colour, bool has_normal, size_t num_tex_coords>
-auto load_mesh(const std::string &path) -> std::vector<VertexAttributes<has_colour, has_normal, num_tex_coords>>
+template <bool has_colour, bool has_normal, size_t num_tex_coords, typename... uniforms>
+auto load_mesh(const std::string &path, ShaderProgram &shader_program) -> std::vector<Mesh<has_colour, has_normal, num_tex_coords, uniforms...>>
 {
     Assimp::Importer importer;
 
     // Logic: Always triangulate. Generate normals only if requested.
-    unsigned int flags = aiProcess_Triangulate | aiProcess_FlipUVs;
-    if constexpr (has_normal)
-    {
-        flags |= aiProcess_GenSmoothNormals;
-    }
+    unsigned int flags = aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenSmoothNormals;
 
     const aiScene *scene = importer.ReadFile(path, flags);
 
@@ -110,58 +108,13 @@ auto load_mesh(const std::string &path) -> std::vector<VertexAttributes<has_colo
         throw std::runtime_error("Assimp: " + std::string(importer.GetErrorString()));
     }
 
-    using Vertex = VertexAttributes<has_colour, has_normal, num_tex_coords>;
-    std::vector<Vertex> vertices;
+    std::vector<Mesh<has_colour, has_normal, num_tex_coords, uniforms...>> meshes;
 
     for (unsigned int m = 0; m < scene->mNumMeshes; m++)
     {
-        aiMesh *mesh = scene->mMeshes[m];
-
-        // Validation for required attributes
-        if constexpr (has_colour)
-        {
-            if (!mesh->HasVertexColors(0))
-                throw std::runtime_error("Mesh missing required colour data");
-        }
-        if constexpr (num_tex_coords > 0)
-        {
-            if (!mesh->HasTextureCoords(0))
-                throw std::runtime_error("Mesh missing required texture data");
-        }
-
-        for (unsigned int f = 0; f < mesh->mNumFaces; f++)
-        {
-            aiFace &face = mesh->mFaces[f];
-            for (unsigned int i = 0; i < face.mNumIndices; i++)
-            {
-                unsigned int idx = face.mIndices[i];
-                Vertex v;
-
-                v.position = {mesh->mVertices[idx].x, mesh->mVertices[idx].y, mesh->mVertices[idx].z};
-
-                if constexpr (has_normal)
-                {
-                    v.normal = {mesh->mNormals[idx].x, mesh->mNormals[idx].y, mesh->mNormals[idx].z};
-                }
-
-                if constexpr (has_colour)
-                {
-                    aiColor4D c = mesh->mColors[0][idx];
-                    v.colour = {c.r, c.g, c.b, c.a};
-                }
-
-                if constexpr (num_tex_coords >= 1)
-                    v.tex_coords[0] = mesh->mTextureCoords[0][idx][0];
-                if constexpr (num_tex_coords >= 2)
-                    v.tex_coords[1] = mesh->mTextureCoords[0][idx][1];
-                if constexpr (num_tex_coords >= 3)
-                    v.tex_coords[2] = mesh->mTextureCoords[0][idx][2];
-
-                vertices.push_back(v);
-            }
-        }
+        meshes.push_back(Mesh<has_colour, has_normal, num_tex_coords, uniforms...>(*scene->mMeshes[m], shader_program));
     }
-    return vertices;
+    return meshes;
 }
 
 auto main() -> int
@@ -210,28 +163,12 @@ auto main() -> int
 
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
 
-    //auto vertices = cube<true, false, 0>(60.0f);
-    auto colourless_vertices = load_mesh<false, true, 0>("teapot.obj");
-
-    std::vector<VertexAttributes<true, false, false>> vertices;
-    for (size_t i = 0; i < colourless_vertices.size(); i++)
-    {
-        vertices.push_back(
-            {colourless_vertices[i].position,
-             {0.5 - (colourless_vertices[i].position.z / 100.0f),
-              0.33f,
-              0.5 + colourless_vertices[i].position.z / 100.0f,
-              1.0f},
-             {},
-             {}}
-        );
-    }
-
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
-    auto vao1 = std::make_unique<VertexArrayObject<true, false, 0>>();
-    vao1->add_vbo(vertices);
+    auto vertices = cube<true, false, 0>(50.0f);
+    //auto mesh1 = std::make_unique<Mesh<true, false, 0, glm::mat4>>(vertices, worldspace_shader);
+    auto mesh1 = std::make_unique<Mesh<true, false, 0, glm::mat4>>(load_mesh<true, false, 0, glm::mat4>("teapot2.obj", worldspace_shader)[0]);
 
     auto ndc_vao = std::make_unique<VertexArrayObject<true, false, 0>>();
     auto triangle_vertices = std::vector<VertexAttributes<true, false, 0>>({
@@ -310,11 +247,8 @@ auto main() -> int
         glm::mat4 combined_transform_mat =
             transform_mat * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)) * rotation_mat;
 
-        worldspace_shader.use();
-        vao1->use();
-        GLint combined_transform_mat_location = worldspace_shader.get_uniform_location("combined_transform_mat");
-        glUniformMatrix4fv(combined_transform_mat_location, 1, false, glm::value_ptr(combined_transform_mat));
-        vao1->draw();
+        std::array<GLint, 1> uniform_locations = {worldspace_shader.get_uniform_location("combined_transform_mat")};
+        mesh1->draw(uniform_locations, combined_transform_mat);
         for (float i = 100.0f; i <= 1000.0f; i += 100.0f)
         {
             for (float j = -500.0f; j <= 500.0f; j += 100.0f)
@@ -323,13 +257,7 @@ auto main() -> int
                 {
                     combined_transform_mat =
                         transform_mat * glm::translate(glm::mat4(1.0f), glm::vec3(-i, k, j)) * rotation_mat;
-                    glUniformMatrix4fv(
-                        combined_transform_mat_location,
-                        1,
-                        false,
-                        glm::value_ptr(combined_transform_mat)
-                    );
-                    vao1->draw();
+                    mesh1->draw(uniform_locations, combined_transform_mat);
                 }
             }
         }
