@@ -22,79 +22,102 @@
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 
+#include "mesh/mesh.h"
 #include "shader/shader.h"
 #include "vertex/vao.h"
-#include "mesh/mesh.h"
 
 #define WINDOW_WIDTH 1920
 #define WINDOW_HEIGHT 1080
-#define BOX_WIDTH 400
-#define BOX_HEIGHT 400
+
+// NOLINTBEGIN
 
 template <bool has_colour, bool has_normal, size_t num_tex_coords>
 auto cube(float side_length) -> std::vector<VertexAttributes<has_colour, has_normal, num_tex_coords>>
 {
     using Vertex = VertexAttributes<has_colour, has_normal, num_tex_coords>;
-    float h = side_length / 2.0f;
+    float half_length = side_length / 2.0F;
     std::vector<Vertex> vertices;
-    vertices.reserve(36);
+    const size_t num_vertices = 36;
+    vertices.reserve(num_vertices);
 
     // 8 Corner points
-    glm::vec3 p0{-h, -h, h}, p1{h, -h, h}, p2{h, h, h}, p3{-h, h, h}, p4{-h, -h, -h}, p5{h, -h, -h}, p6{h, h, -h},
-        p7{-h, h, -h};
+    glm::vec3 point0{-half_length, -half_length, half_length};
+    glm::vec3 point1{half_length, -half_length, half_length};
+    glm::vec3 point2{half_length, half_length, half_length};
+    glm::vec3 point3{-half_length, half_length, half_length};
+    glm::vec3 point4{-half_length, -half_length, -half_length};
+    glm::vec3 point5{half_length, -half_length, -half_length};
+    glm::vec3 point6{half_length, half_length, -half_length};
+    glm::vec3 point7{-half_length, half_length, -half_length};
 
     // CGA Palette for faces
-    const glm::vec4 cga[] = {
-        {1.0f, 0.0f, 0.0f, 1.0f},
-        {0.0f, 1.0f, 0.0f, 1.0f},
-        {0.0f, 0.0f, 1.0f, 1.0f},
-        {0.75f, 0.75f, 0.0f, 1.0f},
-        {0.75f, 0.0f, 0.75f, 1.0f},
-        {0.0f, 0.75f, 0.75f, 1.0f}
-    };
+    const std::array<glm::vec4, 6> cga = {{
+        {1.0F, 0.0F, 0.0F, 1.0F},
+        {0.0F, 1.0F, 0.0F, 1.0F},
+        {0.0F, 0.0F, 1.0F, 1.0F},
+        {0.75F, 0.75F, 0.0F, 1.0F},
+        {0.75F, 0.0F, 0.75F, 1.0F},
+        {0.0F, 0.75F, 0.75F, 1.0F},
+    }};
 
     // UV coordinates for a single face
-    const glm::vec3 uvs[] = {{0, 1, 0}, {1, 1, 0}, {1, 0, 0}, {0, 0, 0}};
+    const std::array<glm::vec3, 4> uvs = {{
+        {0.0F, 1.0F, 0.0F},
+        {1.0F, 1.0F, 0.0F},
+        {1.0F, 0.0F, 0.0F},
+        {0.0F, 0.0F, 0.0F},
+    }};
 
-    auto addFace = [&](glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, glm::vec3 norm, int faceIdx) {
+    auto add_face = [&](std::array<glm::vec3, 4> points, glm::vec3 norm, size_t face_idx) {
         auto push = [&](glm::vec3 pos, glm::vec3 tex_coords) {
-            Vertex v;
-            v.position = pos;
+            Vertex vertex;
+            vertex.position = pos;
             if constexpr (has_normal)
-                v.normal = norm;
+            {
+                vertex.normal = norm;
+            }
             if constexpr (has_colour)
-                v.colour = cga[faceIdx];
+            {
+                vertex.colour = cga[face_idx];
+            }
             if constexpr (num_tex_coords >= 1)
-                v.tex_coords[0] = tex_coords[0];
+            {
+                vertex.tex_coords[0] = tex_coords[0];
+            }
             if constexpr (num_tex_coords >= 2)
-                v.tex_coords[1] = tex_coords[1];
+            {
+                vertex.tex_coords[1] = tex_coords[1];
+            }
             if constexpr (num_tex_coords >= 3)
-                v.tex_coords[2] = tex_coords[2];
-            vertices.push_back(v);
+            {
+                vertex.tex_coords[2] = tex_coords[2];
+            }
+            vertices.push_back(vertex);
         };
 
         // Two triangles per face
-        push(a, uvs[0]);
-        push(b, uvs[1]);
-        push(c, uvs[2]);
-        push(a, uvs[0]);
-        push(c, uvs[2]);
-        push(d, uvs[3]);
+        push(points[0], uvs[0]);
+        push(points[1], uvs[1]);
+        push(points[2], uvs[2]);
+        push(points[0], uvs[0]);
+        push(points[2], uvs[2]);
+        push(points[3], uvs[3]);
     };
 
     // Define faces: Front, Back, Top, Bottom, Left, Right
-    addFace(p0, p1, p2, p3, {0, 0, 1}, 0);
-    addFace(p5, p4, p7, p6, {0, 0, -1}, 1);
-    addFace(p3, p2, p6, p7, {0, 1, 0}, 2);
-    addFace(p4, p5, p1, p0, {0, -1, 0}, 3);
-    addFace(p4, p0, p3, p7, {-1, 0, 0}, 4);
-    addFace(p1, p5, p6, p2, {1, 0, 0}, 5);
+    add_face(std::array{point0, point1, point2, point3}, {0, 0, 1}, 0);
+    add_face(std::array{point5, point4, point7, point6}, {0, 0, -1}, 1);
+    add_face(std::array{point3, point2, point6, point7}, {0, 1, 0}, 2);
+    add_face(std::array{point4, point5, point1, point0}, {0, -1, 0}, 3);
+    add_face(std::array{point4, point0, point3, point7}, {-1, 0, 0}, 4);
+    add_face(std::array{point1, point5, point6, point2}, {1, 0, 0}, 5);
 
     return vertices;
 }
 
 template <bool has_colour, bool has_normal, size_t num_tex_coords, typename... uniforms>
-auto load_mesh(const std::string &path, ShaderProgram &shader_program) -> std::vector<Mesh<has_colour, has_normal, num_tex_coords, uniforms...>>
+auto load_mesh(const std::string &path, std::shared_ptr<ShaderProgram> shader_program)
+    -> std::vector<Mesh<has_colour, has_normal, num_tex_coords, uniforms...>>
 {
     Assimp::Importer importer;
 
@@ -110,9 +133,12 @@ auto load_mesh(const std::string &path, ShaderProgram &shader_program) -> std::v
 
     std::vector<Mesh<has_colour, has_normal, num_tex_coords, uniforms...>> meshes;
 
-    for (unsigned int m = 0; m < scene->mNumMeshes; m++)
+    for (unsigned int mesh_idx = 0; mesh_idx < scene->mNumMeshes; mesh_idx++)
     {
-        meshes.push_back(Mesh<has_colour, has_normal, num_tex_coords, uniforms...>(*scene->mMeshes[m], shader_program));
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        meshes.push_back(
+            Mesh<has_colour, has_normal, num_tex_coords, uniforms...>(*scene->mMeshes[mesh_idx], shader_program)
+        );
     }
     return meshes;
 }
@@ -158,8 +184,8 @@ auto main() -> int
         return -1;
     }
 
-    auto worldspace_shader = shader_wcnn();
-    auto ndcspace_shader = shader_ncnn();
+    auto worldspace_shader = std::make_shared<ShaderProgram>(shader_wcnn());
+    auto ndcspace_shader = std::make_shared<ShaderProgram>(shader_ncnn());
 
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
 
@@ -167,16 +193,17 @@ auto main() -> int
     glDepthFunc(GL_LESS);
 
     auto vertices = cube<true, false, 0>(50.0f);
-    //auto mesh1 = std::make_unique<Mesh<true, false, 0, glm::mat4>>(vertices, worldspace_shader);
-    auto mesh1 = std::make_unique<Mesh<true, false, 0, glm::mat4>>(load_mesh<true, false, 0, glm::mat4>("teapot2.obj", worldspace_shader)[0]);
+    auto mesh1 = std::make_unique<Mesh<true, false, 0, glm::mat4>>(vertices, worldspace_shader);
+    //auto mesh1 = std::make_unique<Mesh<true, false, 0, glm::mat4>>(
+    //    load_mesh<true, false, 0, glm::mat4>("teapot2.obj", worldspace_shader)[0]
+    // );
 
-    auto ndc_vao = std::make_unique<VertexArrayObject<true, false, 0>>();
     auto triangle_vertices = std::vector<VertexAttributes<true, false, 0>>({
         {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {}, {}},
         {{1.0f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {}, {}},
         {{0.75f, 0.75f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {}, {}},
     });
-    ndc_vao->add_vbo(triangle_vertices);
+    auto ndc_mesh = std::make_unique<Mesh<true, false, 0>>(triangle_vertices, ndcspace_shader);
 
     bool quit = false;
     SDL_Event event;
@@ -186,10 +213,10 @@ auto main() -> int
     std::array modes = {GL_LINE, GL_POINT, GL_FILL};
     size_t mode = 2;
 
-    size_t window_width = WINDOW_WIDTH;
-    size_t window_height = WINDOW_HEIGHT;
+    int window_width = WINDOW_WIDTH;
+    int window_height = WINDOW_HEIGHT;
 
-    size_t i = 0;
+    size_t frames = 0;
 
     while (!quit)
     {
@@ -198,7 +225,7 @@ auto main() -> int
             if (event.type == SDL_EVENT_QUIT)
             {
 
-                std::cout << ((i * 1000000000) /
+                std::cout << ((frames * 1000000000) /
                               (std::chrono::system_clock::now().time_since_epoch() - start_time).count())
                           << std::endl;
                 quit = true;
@@ -247,7 +274,7 @@ auto main() -> int
         glm::mat4 combined_transform_mat =
             transform_mat * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)) * rotation_mat;
 
-        std::array<GLint, 1> uniform_locations = {worldspace_shader.get_uniform_location("combined_transform_mat")};
+        std::array<GLint, 1> uniform_locations = {worldspace_shader->get_uniform_location("combined_transform_mat")};
         mesh1->draw(uniform_locations, combined_transform_mat);
         for (float i = 100.0f; i <= 1000.0f; i += 100.0f)
         {
@@ -261,15 +288,15 @@ auto main() -> int
                 }
             }
         }
-        ndcspace_shader.use();
-        ndc_vao->use();
-        ndc_vao->draw();
+        std::array<GLint, 0> ndc_uniform_locations = {};
+        ndc_mesh->draw(ndc_uniform_locations);
 
         // Present the backbuffer to the screen
         SDL_GL_SwapWindow(window.get());
 
-        i++;
+        frames++;
     }
     SDL_Quit();
     return 0;
 }
+// NOLINTEND

@@ -45,6 +45,8 @@ add_subdirectory(src)
 
 add_executable(game src/main.cpp)
 
+set_property(TARGET game PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+
 if(MSVC)
     target_compile_options(game PRIVATE /W4 /WX) # Level 4 warnings, treat as errors
 else()

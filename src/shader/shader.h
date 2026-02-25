@@ -5,10 +5,10 @@
 class ShaderProgram
 {
   public:
-    ShaderProgram(unsigned int program) : program(program) {};
+    explicit ShaderProgram(unsigned int program) : program(program) {};
     ShaderProgram(const char *vertex_source, const char *fragment_source);
-    void use();
-    auto get_uniform_location(std::string_view uniform) -> GLint;
+    void use() const;
+    [[nodiscard]] auto get_uniform_location(std::string_view uniform) const -> GLint;
 
   private:
     unsigned int program;

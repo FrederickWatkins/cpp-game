@@ -1,7 +1,16 @@
-#Checks: 'bugprone-*,
-#         clang-analyzer-*,
-#         cppcoreguidelines-*, 
-#         google-*,
-#         modernize-*,
-#         readability-*'
+Checks: 'bugprone-*,
+         clang-analyzer-*,
+         cppcoreguidelines-*, 
+         google-*,
+         modernize-*,
+         readability-*'
+CheckOptions:
+  - key:             cppcoreguidelines-avoid-magic-numbers.IgnoredFloatingPointValues
+    value:           "0.0;1.0;2.0"
+  - key:             cppcoreguidelines-avoid-magic-numbers.IgnoredIntegerValues
+    value:           "1;2;3;4;5"
+  - key:             readability-magic-numbers.IgnoredFloatingPointValues
+    value:           "0.0;1.0;2.0"
+  - key:             readability-magic-numbers.IgnoredIntegerValues
+    value:           "1;2;3;4;5"
 #WarningsAsErrors: '*'
