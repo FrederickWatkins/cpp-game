@@ -16,7 +16,6 @@ layout(location = 2) in vec3 aTexCoords;
 #endif
 #ifdef LIGHTING
 layout(location = 3) in vec3 aNormals;
-out vec3 light_dir;
 out vec3 normal;
 out vec3 frag_pos;
 #endif
@@ -32,5 +31,9 @@ void main() {
     #endif
     #ifdef VERTEX_COLOUR
     vertex_colour = aColour;
+    #endif
+    #ifdef LIGHTING
+    normal = normalize(mat3(translate_mat) * aNormals);
+    frag_pos = (translate_mat * vec4(aPos.xyz, 1.0f)).xyz;
     #endif
 }

@@ -53,16 +53,16 @@ template <bool has_colour, bool has_normal, size_t num_tex_coords> class VertexA
         {
             add_attribute_pointer(1, 4, GL_FLOAT, offsetof(Vertex, colour));
         }
-        // Normals
-        if constexpr (has_normal)
-        {
-            add_attribute_pointer(2, 3, GL_FLOAT, offsetof(Vertex, normal));
-        }
         // Texture coordinates
         static_assert(num_tex_coords <= 3, "Texture coordinates over 3d are not supported");
         if constexpr (num_tex_coords > 0 && num_tex_coords <= 3)
         {
-            add_attribute_pointer(3, num_tex_coords, GL_FLOAT, offsetof(Vertex, tex_coords));
+            add_attribute_pointer(2, num_tex_coords, GL_FLOAT, offsetof(Vertex, tex_coords));
+        }
+        // Normals
+        if constexpr (has_normal)
+        {
+            add_attribute_pointer(3, 3, GL_FLOAT, offsetof(Vertex, normal));
         }
         count = vertex_data.size();
         // Unbind
