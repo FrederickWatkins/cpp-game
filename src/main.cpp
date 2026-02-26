@@ -24,7 +24,6 @@
 
 #include "mesh/mesh.hpp"
 #include "shader/shader.hpp"
-#include "shader/default_shaders.hpp"
 #include "vertex/vao.hpp"
 
 #define WINDOW_WIDTH 1920
@@ -116,9 +115,11 @@ auto cube(float side_length) -> std::vector<VertexAttributes<has_colour, has_nor
     return vertices;
 }
 
-template <bool has_colour, bool has_normal, size_t num_tex_coords, typename... uniforms>
-auto load_mesh(const std::string &path, std::shared_ptr<ShaderProgram> shader_program)
-    -> std::vector<Mesh<has_colour, has_normal, num_tex_coords, uniforms...>>
+template <bool NDC, bool has_colour, bool has_lighting, size_t num_tex_coords>
+auto load_scene(
+    const std::string &path,
+    std::shared_ptr<ShaderProgram<NDC, has_colour, has_lighting, num_tex_coords>> shader_program
+) -> std::vector<Mesh<false, has_colour, has_lighting, num_tex_coords>>
 {
     Assimp::Importer importer;
 
@@ -132,13 +133,13 @@ auto load_mesh(const std::string &path, std::shared_ptr<ShaderProgram> shader_pr
         throw std::runtime_error("Assimp: " + std::string(importer.GetErrorString()));
     }
 
-    std::vector<Mesh<has_colour, has_normal, num_tex_coords, uniforms...>> meshes;
+    std::vector<Mesh<NDC, has_colour, has_lighting, num_tex_coords>> meshes;
 
     for (unsigned int mesh_idx = 0; mesh_idx < scene->mNumMeshes; mesh_idx++)
     {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         meshes.push_back(
-            Mesh<has_colour, has_normal, num_tex_coords, uniforms...>(*scene->mMeshes[mesh_idx], shader_program)
+            Mesh<NDC, has_colour, has_lighting, num_tex_coords>(*scene->mMeshes[mesh_idx], shader_program)
         );
     }
     return meshes;
@@ -185,9 +186,12 @@ auto main() -> int
         return -1;
     }
 
-    auto lighting_shader = std::make_shared<ShaderProgram>(shader_wcnp());
-    auto worldspace_shader = std::make_shared<ShaderProgram>(shader_wcnn());
-    auto ndcspace_shader = std::make_shared<ShaderProgram>(shader_ncnn());
+    auto lighting_shader = std::make_shared<ShaderProgram<false, true, true, 0>>();
+    auto lighting_uniforms = lighting_shader->get_uniforms();
+    auto worldspace_shader = std::make_shared<ShaderProgram<false, true, false, 0>>();
+    auto worldspace_uniforms = worldspace_shader->get_uniforms();
+    auto ndcspace_shader = std::make_shared<ShaderProgram<true, true, false, 0>>();
+    auto ndc_uniforms = ndcspace_shader->get_uniforms();
 
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
 
@@ -195,20 +199,17 @@ auto main() -> int
     glDepthFunc(GL_LESS);
 
     auto vertices = cube<true, false, 0>(50.0f);
-    auto mesh1 = std::make_unique<Mesh<true, false, 0, glm::mat4>>(vertices, worldspace_shader);
-    // auto mesh1 = std::make_unique<Mesh<true, false, 0, glm::mat4>>(
-    //    load_mesh<true, false, 0, glm::mat4>("teapot2.obj", worldspace_shader)[0]
-    // );
+    // auto mesh1 = std::make_unique<Mesh<false, true, false, 0>>(vertices, worldspace_shader);
+    auto mesh1 = std::make_unique<Mesh<false, true, false, 0>>(
+       load_scene<false, true, false, 0>("teapot2.obj", worldspace_shader)[0]
+    );
 
     auto triangle_vertices = std::vector<VertexAttributes<true, false, 0>>({
         {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {}, {}},
         {{1.0f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {}, {}},
         {{0.75f, 0.75f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {}, {}},
     });
-    auto ndc_mesh = std::make_unique<Mesh<true, false, 0>>(triangle_vertices, ndcspace_shader);
-
-    auto lighting_vertices = std::vector<VertexAttributesWCNP>{};
-    auto lighting_mesh = std::make_unique<MeshWCNP>(lighting_vertices, lighting_shader);
+    auto ndc_mesh = std::make_unique<Mesh<true, true, false, 0>>(triangle_vertices, ndcspace_shader);
 
     bool quit = false;
     SDL_Event event;
@@ -276,25 +277,26 @@ auto main() -> int
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glm::mat4 combined_transform_mat =
-            transform_mat * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)) * rotation_mat;
-
-        std::array<GLint, 1> uniform_locations = {worldspace_shader->get_uniform_location("combined_transform_mat")};
-        mesh1->draw(uniform_locations, combined_transform_mat);
+        glm::mat4 translate_mat = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)) * rotation_mat;
+        worldspace_shader->use();
+        worldspace_uniforms.translate_mat.set(translate_mat);
+        worldspace_uniforms.transform_mat.set(transform_mat);
+        mesh1->draw();
         for (float i = 100.0f; i <= 1000.0f; i += 100.0f)
         {
             for (float j = -500.0f; j <= 500.0f; j += 100.0f)
             {
                 for (float k = -300.0f; k <= 100.0f; k += 100.0f)
                 {
-                    combined_transform_mat =
-                        transform_mat * glm::translate(glm::mat4(1.0f), glm::vec3(-i, k, j)) * rotation_mat;
-                    mesh1->draw(uniform_locations, combined_transform_mat);
+                    translate_mat = glm::translate(glm::mat4(1.0f), glm::vec3(-i, k, j)) * rotation_mat;
+                    worldspace_uniforms.translate_mat.set(translate_mat);
+                    mesh1->draw();
                 }
             }
         }
-        std::array<GLint, 0> ndc_uniform_locations = {};
-        ndc_mesh->draw(ndc_uniform_locations);
+        ndcspace_shader->use();
+        ndc_uniforms.translate_mat.set(glm::mat4(1));
+        ndc_mesh->draw();
 
         // Present the backbuffer to the screen
         SDL_GL_SwapWindow(window.get());

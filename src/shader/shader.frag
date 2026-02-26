@@ -1,3 +1,5 @@
+#version 330 core
+#define DEFINES
 #ifdef VERTEX_COLOUR
 in vec4 vertex_colour;
 #endif
