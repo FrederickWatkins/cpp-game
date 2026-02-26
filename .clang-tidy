@@ -3,7 +3,9 @@ Checks: 'bugprone-*,
          cppcoreguidelines-*, 
          google-*,
          modernize-*,
-         readability-*'
+         readability-*,
+         -bugprone-easily-swappable-parameters,
+         -readability-convert-member-functions-to-static'
 CheckOptions:
   - key:             cppcoreguidelines-avoid-magic-numbers.IgnoredFloatingPointValues
     value:           "0.0;1.0;2.0"

@@ -5,7 +5,6 @@
 #include <SDL3/SDL_video.h>
 #include <array>
 #include <chrono>
-#include <cmath>
 #include <glad/glad.h>
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -13,6 +12,7 @@
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 #include <memory>
@@ -22,9 +22,9 @@
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 
-#include "mesh/mesh.hpp"
+#include "scene/mesh.hpp"
+#include "scene/scene.hpp"
 #include "shader/shader.hpp"
-#include "vertex/vao.hpp"
 
 #define WINDOW_WIDTH 1920
 #define WINDOW_HEIGHT 1080
@@ -117,9 +117,8 @@ auto cube(float side_length) -> std::vector<VertexAttributes<has_colour, has_nor
 
 template <bool NDC, bool has_colour, bool has_lighting, size_t num_tex_coords>
 auto load_scene(
-    const std::string &path,
-    std::shared_ptr<ShaderProgram<NDC, has_colour, has_lighting, num_tex_coords>> shader_program
-) -> std::vector<Mesh<false, has_colour, has_lighting, num_tex_coords>>
+    const std::string &path
+) -> std::vector<Mesh<has_colour, has_lighting, num_tex_coords>>
 {
     Assimp::Importer importer;
 
@@ -133,14 +132,12 @@ auto load_scene(
         throw std::runtime_error("Assimp: " + std::string(importer.GetErrorString()));
     }
 
-    std::vector<Mesh<NDC, has_colour, has_lighting, num_tex_coords>> meshes;
+    std::vector<Mesh<has_colour, has_lighting, num_tex_coords>> meshes;
 
     for (unsigned int mesh_idx = 0; mesh_idx < scene->mNumMeshes; mesh_idx++)
     {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-        meshes.push_back(
-            Mesh<NDC, has_colour, has_lighting, num_tex_coords>(*scene->mMeshes[mesh_idx], shader_program)
-        );
+        meshes.push_back(Mesh<has_colour, has_lighting, num_tex_coords>(*scene->mMeshes[mesh_idx]));
     }
     return meshes;
 }
@@ -198,18 +195,34 @@ auto main() -> int
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
-    auto vertices = cube<true, true, 0>(50.0f);
-    // auto mesh1 = std::make_unique<Mesh<false, true, true, 0>>(vertices, lighting_shader);
-    auto mesh1 = std::make_unique<Mesh<false, true, true, 0>>(
-        load_scene<false, true, true, 0>("teapot2.obj", lighting_shader)[0]
+    auto camera = std::make_shared<Camera>(
+        glm::vec3(90.0f, 60.0f, 60.0f),
+        glm::quatLookAt(glm::normalize(glm::vec3(-30.0f, -10.0f, -20.0f)), glm::vec3(0.0f, 1.0f, 0.0f)),
+        70.0f,
+        16.0f / 9.0f,
+        1.0f,
+        1000.0f
     );
+    auto light = std::make_shared<Light>();
+    auto scene = Scene(camera, light);
+
+    auto vertices = cube<true, false, 0>(50.0f);
+    auto worldspace_mesh = std::make_shared<Mesh<true, false, 0>>(
+    load_scene<false, true, false, 0>("teapot2.obj")[0]
+    );
+    // auto worldspace_mesh = std::make_shared<Mesh<true, false, 0>>(vertices);
+    auto worldspace_node =
+        std::make_shared<Node<false, true, false, 0>>(worldspace_mesh, worldspace_shader, glm::mat4(1));
+    scene.add_node(worldspace_node);
 
     auto triangle_vertices = std::vector<VertexAttributes<true, false, 0>>({
         {{0.5f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {}, {}},
         {{1.0f, 0.5f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {}, {}},
         {{0.75f, 0.75f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {}, {}},
     });
-    auto ndc_mesh = std::make_unique<Mesh<true, true, false, 0>>(triangle_vertices, ndcspace_shader);
+    auto ndc_mesh = std::make_shared<Mesh<true, false, 0>>(triangle_vertices);
+    auto ndc_node = std::make_shared<Node<true, true, false, 0>>(ndc_mesh, ndcspace_shader, glm::mat4(1));
+    scene.add_node(ndc_node);
 
     bool quit = false;
     SDL_Event event;
@@ -254,57 +267,17 @@ auto main() -> int
 
         glPolygonMode(GL_FRONT_AND_BACK, modes[mode]);
 
+
+        camera->set_aspect_ratio(static_cast<float>(window_width) / static_cast<float>(window_height));
+
         GLfloat curr_time =
             std::chrono::duration<float>(std::chrono::system_clock::now().time_since_epoch() - start_time).count();
-        GLfloat y_offset = (sin(curr_time / 1.5f) / 2.0f);
-
-        glm::mat4 rotation_mat =
-            glm::rotate(glm::mat4(1.0f), glm::radians(30.0f * curr_time), glm::vec3(0.0f, 1.0f, 0.0f));
-
-        glm::mat4 view_mat = glm::lookAt(
-            30.0f * glm::vec3(4.0f, 3 * y_offset + 2.0f, 1.0f),
-            glm::vec3(0.0f, 30.0f, 0.0f),
-            glm::vec3(0.0f, 1.0f, 0.0f)
-        );
-        glm::mat4 proj_mat = glm::perspective(
-            glm::radians(70.0f),
-            static_cast<float>(window_width) / static_cast<float>(window_height),
-            10.0f,
-            100000.0f
-        );
-        glm::mat4 projection_mat = proj_mat * view_mat;
+        worldspace_node->set_transform(glm::rotate(glm::mat4(1), glm::radians(30.0f * curr_time), glm::vec3(0.0f, 1.0f, 0.0f)));
 
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glm::mat4 transform_mat = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)) * rotation_mat;
-        lighting_shader->use();
-        lighting_uniforms.transform_mat.set(transform_mat);
-        lighting_uniforms.projection_mat.set(projection_mat);
-        lighting_uniforms.intensities.set(glm::vec3(0.1f, 1.0f, 0.8f));
-        lighting_uniforms.light_colour.set(glm::vec3(1.0f, 1.0f, 1.0f));
-        lighting_uniforms.light_pos.set(30.0f * glm::vec3(2.0f, 3.0f, -3.0f));
-        lighting_uniforms.view_pos.set(30.0f * glm::vec3(4.0f, 3 * y_offset + 2.0f, 1.0f));
-        lighting_uniforms.material.ambient.set(glm::vec3(1.0f, 1.0f, 1.0f));
-        lighting_uniforms.material.diffuse.set(glm::vec3(1.0f, 1.0f, 1.0f));
-        lighting_uniforms.material.specular.set(glm::vec3(1.0f, 1.0f, 1.0f));
-        lighting_uniforms.material.shininess.set(32.0f);
-        mesh1->draw();
-        for (float i = 100.0f; i <= 2000.0f; i += 150.0f)
-        {
-            for (float j = -500.0f; j <= 500.0f; j += 150.0f)
-            {
-                for (float k = -300.0f; k <= 100.0f; k += 100.0f)
-                {
-                    transform_mat = glm::translate(glm::mat4(1.0f), glm::vec3(-i, k, j)) * rotation_mat;
-                    lighting_uniforms.transform_mat.set(transform_mat);
-                    mesh1->draw();
-                }
-            }
-        }
-        ndcspace_shader->use();
-        ndc_uniforms.transform_mat.set(glm::mat4(1));
-        ndc_mesh->draw();
+        scene.draw();
 
         // Present the backbuffer to the screen
         SDL_GL_SwapWindow(window.get());
