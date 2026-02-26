@@ -24,6 +24,7 @@
 
 #include "mesh/mesh.hpp"
 #include "shader/shader.hpp"
+#include "shader/default_shaders.hpp"
 #include "vertex/vao.hpp"
 
 #define WINDOW_WIDTH 1920
@@ -184,6 +185,7 @@ auto main() -> int
         return -1;
     }
 
+    auto lighting_shader = std::make_shared<ShaderProgram>(shader_wcnp());
     auto worldspace_shader = std::make_shared<ShaderProgram>(shader_wcnn());
     auto ndcspace_shader = std::make_shared<ShaderProgram>(shader_ncnn());
 
@@ -194,7 +196,7 @@ auto main() -> int
 
     auto vertices = cube<true, false, 0>(50.0f);
     auto mesh1 = std::make_unique<Mesh<true, false, 0, glm::mat4>>(vertices, worldspace_shader);
-    //auto mesh1 = std::make_unique<Mesh<true, false, 0, glm::mat4>>(
+    // auto mesh1 = std::make_unique<Mesh<true, false, 0, glm::mat4>>(
     //    load_mesh<true, false, 0, glm::mat4>("teapot2.obj", worldspace_shader)[0]
     // );
 
@@ -204,6 +206,9 @@ auto main() -> int
         {{0.75f, 0.75f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}, {}, {}},
     });
     auto ndc_mesh = std::make_unique<Mesh<true, false, 0>>(triangle_vertices, ndcspace_shader);
+
+    auto lighting_vertices = std::vector<VertexAttributesWCNP>{};
+    auto lighting_mesh = std::make_unique<MeshWCNP>(lighting_vertices, lighting_shader);
 
     bool quit = false;
     SDL_Event event;

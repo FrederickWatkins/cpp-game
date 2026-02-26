@@ -1,5 +1,6 @@
 #pragma once
 #include <glad/glad.h>
+#include <glm/glm.hpp>
 #include <string_view>
 
 class ShaderProgram
@@ -14,8 +15,13 @@ class ShaderProgram
     unsigned int program;
 };
 
-/// Shader from NDC space, with colour, no texture mapping, no lighting
-auto shader_ncnn() -> ShaderProgram;
-
-/// Shader from world space, with colour, no texture mapping, no lighting
-auto shader_wcnn() -> ShaderProgram;
+// NOLINTBEGIN
+struct alignas(16) Material
+{
+    alignas(16) glm::vec3 ambient;
+    alignas(16) glm::vec3 diffuse;
+    alignas(16) glm::vec3 specular;
+    float shininess;
+    float padding[3];
+};
+// NOLINTEND

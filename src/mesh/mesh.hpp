@@ -1,3 +1,4 @@
+#pragma once
 #include "../shader/shader.hpp"
 #include "../vertex/vao.hpp"
 #include <assimp/mesh.h>
@@ -129,6 +130,7 @@ template <bool has_colour, bool has_normal, size_t num_tex_coords, typename... u
     void set_uniform(GLint location, const glm::mat2& value) const { glUniformMatrix2fv(location, 1, GL_FALSE, glm::value_ptr(value)); }
     void set_uniform(GLint location, const glm::mat3& value) const { glUniformMatrix3fv(location, 1, GL_FALSE, glm::value_ptr(value)); }
     void set_uniform(GLint location, const glm::mat4& value) const { glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(value)); }
+
     // clang-format on
     // --- OVERLOADS FOR ARRAYS / CONTAINERS ---
 
@@ -159,6 +161,14 @@ template <bool has_colour, bool has_normal, size_t num_tex_coords, typename... u
             glUniform1fv(location, static_cast<GLsizei>(values.size()), values.data());
         }
     }
+
+    // --- OVERLOADS FOR CUSTOM STRUCTS ---
+    void set_uniform(GLint location, const Material value) const {
+        glBindBuffer(GL_UNIFORM_BUFFER, location);
+        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Material), &value);
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    }
+
     std::shared_ptr<ShaderProgram> shader_program;
     VertexArrayObject<has_colour, has_normal, num_tex_coords> vao;
 };

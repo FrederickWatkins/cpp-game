@@ -14,6 +14,9 @@ layout(location = 2) in vec3 aTexCoords;
 #endif
 #ifdef LIGHTING
 layout(location = 3) in vec3 aNormals;
+out vec3 light_dir;
+out vec3 normal;
+out vec3 frag_pos;
 #endif
 #ifndef NDC
 uniform mat4 combined_transform_mat;

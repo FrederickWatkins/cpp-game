@@ -1,0 +1,2 @@
+#define VERTEX_COLOUR
+#define LIGHTING

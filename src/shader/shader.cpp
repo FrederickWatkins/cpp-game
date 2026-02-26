@@ -5,6 +5,8 @@
 #include "fragment_wcnn.h"
 #include "vertex_ncnn.h"
 #include "vertex_wcnn.h"
+#include "vertex_wcnp.h"
+#include "fragment_wcnp.h"
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 ShaderProgram::ShaderProgram(const char *vertex_source, const char *fragment_source)
@@ -18,7 +20,7 @@ ShaderProgram::ShaderProgram(const char *vertex_source, const char *fragment_sou
 
     int vertex_success = 0;
     std::string info_log;
-    info_log.reserve(info_log_size);
+    info_log.resize(info_log_size);
     glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &vertex_success);
     if (vertex_success == 0)
     {
@@ -35,7 +37,7 @@ ShaderProgram::ShaderProgram(const char *vertex_source, const char *fragment_sou
     glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &fragment_success);
     if (fragment_success == 0)
     {
-        glGetShaderInfoLog(fragment_shader, info_log_size, nullptr, info_log.begin().base());
+        glGetShaderInfoLog(fragment_shader, info_log_size, nullptr, info_log.data());
         throw std::runtime_error(std::string("ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n").append(info_log));
     }
 
@@ -84,6 +86,18 @@ auto shader_wcnn() -> ShaderProgram
     if (!initialized)
     {
         program = ShaderProgram(VERTEX_WCNN, FRAGMENT_WCNN);
+        initialized = true;
+    }
+    return program;
+}
+
+auto shader_wcnp() -> ShaderProgram
+{
+    static auto program = ShaderProgram(0);
+    static bool initialized = false;
+    if (!initialized)
+    {
+        program = ShaderProgram(VERTEX_WCNP, FRAGMENT_WCNP);
         initialized = true;
     }
     return program;
