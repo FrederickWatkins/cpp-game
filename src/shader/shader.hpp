@@ -101,8 +101,8 @@ struct MaterialUniforms
 
 template <bool NDC, bool has_lighting> struct ShaderUniforms
 {
-    Uniform<glm::mat4> translate_mat;
-    [[no_unique_address]] std::conditional_t<!NDC, Uniform<glm::mat4>, empty_transform_mat> transform_mat;
+    Uniform<glm::mat4> transform_mat;
+    [[no_unique_address]] std::conditional_t<!NDC, Uniform<glm::mat4>, empty_transform_mat> projection_mat;
     [[no_unique_address]] std::conditional_t<has_lighting, MaterialUniforms, empty_material> material;
     [[no_unique_address]] std::conditional_t<has_lighting, Uniform<glm::vec3>, empty_light_pos> light_pos;
     [[no_unique_address]] std::conditional_t<has_lighting, Uniform<glm::vec3>, empty_light_colour> light_colour;
@@ -207,10 +207,10 @@ template <bool NDC, bool has_colour, bool has_lighting, size_t num_tex_coords> c
     {
         use();
         ShaderUniforms<NDC, has_lighting> uniforms;
-        uniforms.translate_mat = Uniform<glm::mat4>(glGetUniformLocation(program, "translate_mat"));
+        uniforms.transform_mat = Uniform<glm::mat4>(glGetUniformLocation(program, "transform_mat"));
         if constexpr (!NDC)
         {
-            uniforms.transform_mat = Uniform<glm::mat4>(glGetUniformLocation(program, "transform_mat"));
+            uniforms.projection_mat = Uniform<glm::mat4>(glGetUniformLocation(program, "projection_mat"));
         }
         if constexpr (has_lighting)
         {

@@ -272,18 +272,18 @@ auto main() -> int
             10.0f,
             100000.0f
         );
-        glm::mat4 transform_mat = proj_mat * view_mat;
+        glm::mat4 projection_mat = proj_mat * view_mat;
 
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glm::mat4 translate_mat = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)) * rotation_mat;
+        glm::mat4 transform_mat = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)) * rotation_mat;
         lighting_shader->use();
-        lighting_uniforms.translate_mat.set(translate_mat);
         lighting_uniforms.transform_mat.set(transform_mat);
+        lighting_uniforms.projection_mat.set(projection_mat);
         lighting_uniforms.intensities.set(glm::vec3(0.1f, 1.0f, 0.8f));
         lighting_uniforms.light_colour.set(glm::vec3(1.0f, 1.0f, 1.0f));
-        lighting_uniforms.light_pos.set(30.0f * glm::vec3(8.0f, 3.0f, -12.0f));
+        lighting_uniforms.light_pos.set(30.0f * glm::vec3(2.0f, 3.0f, -3.0f));
         lighting_uniforms.view_pos.set(30.0f * glm::vec3(4.0f, 3 * y_offset + 2.0f, 1.0f));
         lighting_uniforms.material.ambient.set(glm::vec3(1.0f, 1.0f, 1.0f));
         lighting_uniforms.material.diffuse.set(glm::vec3(1.0f, 1.0f, 1.0f));
@@ -296,15 +296,15 @@ auto main() -> int
             {
                 for (float k = -300.0f; k <= 100.0f; k += 100.0f)
                 {
-                    translate_mat = glm::translate(glm::mat4(1.0f), glm::vec3(-i, k, j)) * rotation_mat;
-                    lighting_uniforms.translate_mat.set(translate_mat);
+                    transform_mat = glm::translate(glm::mat4(1.0f), glm::vec3(-i, k, j)) * rotation_mat;
+                    lighting_uniforms.transform_mat.set(transform_mat);
                     mesh1->draw();
                 }
             }
         }
         ndcspace_shader->use();
-        ndc_uniforms.translate_mat.set(glm::mat4(1));
-        //ndc_mesh->draw();
+        ndc_uniforms.transform_mat.set(glm::mat4(1));
+        ndc_mesh->draw();
 
         // Present the backbuffer to the screen
         SDL_GL_SwapWindow(window.get());
